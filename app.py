@@ -13,7 +13,7 @@ def create_connection():
         connection = mysql.connector.connect(
             host='localhost',
             user='root',
-            password='Aka789sh',
+            password='141926abhay',
             database='PLMS'
         )
         if connection.is_connected():
@@ -24,7 +24,7 @@ def create_connection():
 
 # Load tables
 def load_tables():
-    engine = create_engine("mysql+mysqlconnector://root:Aka789sh@localhost:3306/PLMS")
+    engine = create_engine("mysql+mysqlconnector://root:141926abhay@localhost:3306/PLMS")
     metadata.reflect(bind=engine)
     return (
         metadata.tables["User"],
@@ -67,6 +67,24 @@ def add_user(user_name, email, phone_number,password, user_type):
         connection.close()
         return user_info
         
+def delete_user(user_id):
+    connection = create_connection()
+    if connection:
+        try:
+            cursor = connection.cursor()
+            delete_statement = """
+                DELETE FROM User WHERE User_ID = %s;
+            """
+            cursor.execute(delete_statement, (user_id,))
+            connection.commit()  # Commit the transaction
+            connection.close()
+            return True
+        except Error as e:
+            st.error(f"Error deleting user: {e}")
+            connection.close()
+            return False
+    return False
+
 
 def get_all_parking_transactions():
     connection = create_connection()
@@ -101,7 +119,7 @@ def validate_login(user_ID, password, user_type):
         cursor = connection.cursor()
         try:
             # Execute the stored procedure with only the input parameter
-            cursor.execute(f"CALL GetUserCredentials({user_ID,user_type})")
+            cursor.execute("CALL GetUserCredentials(%s, %s)", (user_ID, user_type))
             user_info = cursor.fetchone()
             if user_info:
                 user_name, db_password = user_info[0], user_info[1]
@@ -258,6 +276,18 @@ if 'user_type' in st.session_state:
                 st.write(f"**Email**: {user_info[2]}")
                 st.write(f"**Phone Number**: {user_info[3]}")
                 st.write(f"**User Type**: {user_info[4]}")
+
+        st.subheader("Delete User")
+        delete_user_id = st.text_input("Enter User ID to delete")
+        if st.button("Delete User"):
+            if delete_user_id:
+                is_deleted = delete_user(delete_user_id)
+                if is_deleted:
+                    st.success(f"User with ID {delete_user_id} has been deleted.")
+                else:
+                    st.error(f"User with ID {delete_user_id} not found.")
+            else:
+                st.error("Please enter a valid User ID.")
         
         st.subheader("View Users")
         if st.button("View All operators"):

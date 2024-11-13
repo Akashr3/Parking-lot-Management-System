@@ -35,8 +35,7 @@ CREATE TABLE Payment (
     Payment_ID INT PRIMARY KEY AUTO_INCREMENT,
     Transaction_ID INT,
     Payment_Method VARCHAR(20),
-    Payment_Amount float,
+    Payment_Amount FLOAT,
     Payment_Status VARCHAR(20),
-    foreign key (Transaction_ID) REFERENCES Parking_Transaction(Transaction_ID)
-    foreign key(Payment_Amount) REFERENCES Parking_Transaction(Payment_Amount)
+    FOREIGN KEY (Transaction_ID) REFERENCES Parking_Transaction(Transaction_ID)
 );

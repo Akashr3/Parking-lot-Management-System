@@ -81,7 +81,6 @@ BEGIN
         ELSE
             SET NEW.Payment_Amount = base_rate + CEIL((total_hours - 3) / 3) * additional_rate;
         END IF;
-    END IF;
 END //
 
 DELIMITER ;
