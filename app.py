@@ -76,7 +76,7 @@ def get_all_parking_transactions():
         result = cursor.fetchall()
         connection.close()
         return [dict(row) for row in result]
-
+#hi Abhay
 def get_all_operators():
     connection = create_connection()
     if connection:
