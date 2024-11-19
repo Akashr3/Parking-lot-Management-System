@@ -1,5 +1,5 @@
-Create Database PLMS;
-use PLMS;
+Create Database PLMSFinal;
+use PLMSFinal;
 CREATE TABLE User (
     User_ID INT PRIMARY KEY AUTO_INCREMENT,
     User_Name VARCHAR(50),
@@ -8,6 +8,7 @@ CREATE TABLE User (
     User_Type VARCHAR(20),
     Password Varchar(255)
 );
+
 
 CREATE TABLE Parking_Lot (
     Parking_Lot_ID INT PRIMARY KEY AUTO_INCREMENT,
@@ -37,8 +38,10 @@ CREATE TABLE Payment (
     Payment_ID INT PRIMARY KEY AUTO_INCREMENT,
     Transaction_ID INT,
     Payment_Method VARCHAR(20),
-    Payment_Amount FLOAT,
+    Payment_Amount float,
     Payment_Status VARCHAR(20),
-    FOREIGN KEY (Transaction_ID) REFERENCES Parking_Transaction(Transaction_ID)
+    foreign key (Transaction_ID) REFERENCES Parking_Transaction(Transaction_ID)
+
 );
-INSERT into User values(1,'ABC','abc@pesu.com','1234567890','Admin','abc');
+
+INSERT into User values(1,'Abhay','abhay@example.com','1234567890','Admin','Abhay');

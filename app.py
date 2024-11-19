@@ -14,7 +14,7 @@ def create_connection():
             host='localhost',
             user='root',
             password='141926abhay',
-            database='PLMS'
+            database='PLMSFinal'
         )
         if connection.is_connected():
             return connection
@@ -24,7 +24,7 @@ def create_connection():
 
 # Load tables
 def load_tables():
-    engine = create_engine("mysql+mysqlconnector://root:141926abhay@localhost:3306/PLMS")
+    engine = create_engine("mysql+mysqlconnector://root:141926abhay@localhost:3306/PLMSFinal")
     metadata.reflect(bind=engine)
     return (
         metadata.tables["User"],
@@ -116,7 +116,7 @@ def get_vehicles_in_parking_lot():
         cursor = connection.cursor()
         try:
             query = """
-                SELECT v.Vehicle_ID, v.Licence_Plate_Number, v.Vehicle_Type
+                SELECT v.Vehicle_ID, v.License_Plate_Number, v.Vehicle_Type
                 FROM Vehicle v
             """
             cursor.execute(query)
@@ -213,6 +213,50 @@ def get_last_5_transactions_for_user(user_id):
             connection.close()
     return None     
 
+def delete_parking_lot_entry(license_plate_number):
+    connection = create_connection()
+    if connection:
+        try:
+            cursor = connection.cursor()
+            
+            # Step 1: Get Vehicle_ID for the given License Plate Number
+            get_vehicle_id_query = """
+                SELECT Vehicle_ID 
+                FROM Vehicle 
+                WHERE License_Plate_Number = %s
+            """
+            cursor.execute(get_vehicle_id_query, (license_plate_number,))
+            result = cursor.fetchone()
+            
+            if result:
+                vehicle_id = result[0]
+                
+                # Step 2: Delete Parking_Lot entry for the fetched Vehicle_ID
+                delete_query = """
+                    DELETE FROM Parking_Lot 
+                    WHERE Parking_Lot_ID = (
+                        SELECT Parking_Lot_ID 
+                        FROM Parking_Transaction 
+                        WHERE Vehicle_ID = %s
+                        ORDER BY Transaction_ID DESC LIMIT 1
+                    )
+                """
+                cursor.execute(delete_query, (vehicle_id,))
+                reset_auto_increment = """
+                    ALTER TABLE Parking_Lot AUTO_INCREMENT = 1;
+                """
+                cursor.execute(reset_auto_increment)
+                connection.commit()
+                st.success("Parking lot entry removed for this vehicle.")
+            else:
+                st.error("No vehicle found with the provided License Plate Number.")
+        
+        except Error as e:
+            st.error(f"Error: {e}")
+        finally:
+            cursor.close()
+            connection.close()
+
 def validate_login(user_ID, password, user_type):
     connection = create_connection()
     if connection:
@@ -248,14 +292,14 @@ def add_vehicle_entry(vehicle_type, license_plate_number):
         entry_time = datetime.now()  # Get current timestamp
     # Insert statement with %s placeholders
         insert_statement = """
-            INSERT INTO Vehicle (Vehicle_Type, Entry_Time, Licence_Plate_Number)
+            INSERT INTO Vehicle (Vehicle_Type, Entry_Time, License_Plate_Number)
             VALUES (%s, %s, %s)
         """
         cursor.execute(insert_statement, (vehicle_type, entry_time, license_plate_number))
         connection.commit()  # Commit the transaction to save changes
         connection.close()
 
-def get_vehicle_details(license_plate):
+def get_vehicle_details(license_plate_number):
     connection = create_connection()
     if connection:
         cursor=connection.cursor()
@@ -264,7 +308,7 @@ def get_vehicle_details(license_plate):
                     FROM Vehicle 
                     WHERE License_Plate_Number = %s
                     """
-        cursor.execute(query, (license_plate,))
+        cursor.execute(query, (license_plate_number,))
         result = cursor.fetchone()
         connection.close()
     return result
@@ -277,7 +321,7 @@ def add_parking_lot_entry():
             INSERT INTO Parking_Lot (Available)
             VALUES (%s)
         """
-        cursor.execute(insert_parking_lot_statement, (False,))
+        cursor.execute(insert_parking_lot_statement, ('No',))
         connection.commit()
         connection.close() 
 
@@ -378,7 +422,7 @@ if 'user_type' in st.session_state:
                     st.write(f"Entry Time: {entry_time}")
                     st.write(f"Exit Time: {exit_time}")
                     st.write(f"Payment Amount: ₹{payment_amount}")
-        
+                    delete_parking_lot_entry(license_plate_number)
                 connection.close()
             else:
                 st.error("Vehicle not found.")

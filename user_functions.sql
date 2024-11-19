@@ -30,17 +30,27 @@ DELIMITER ;
 
 DELIMITER //
 
-CREATE TRIGGER before_insert_check_id
+CREATE TRIGGER before_insert_check_availability
 BEFORE INSERT ON Parking_Lot
 FOR EACH ROW
 BEGIN
-    IF NEW.Parking_Lot_ID > 500 THEN
+    DECLARE unavailable_count INT;
+
+    -- Count the number of entries where Available = 'No'
+    SELECT COUNT(*) INTO unavailable_count
+    FROM Parking_Lot
+    WHERE Available = 'No';
+
+    -- Check if the count exceeds the limit
+    IF unavailable_count >= 500 THEN
         SIGNAL SQLSTATE '45000'
-        SET MESSAGE_TEXT = 'Parking_Lot_ID cannot exceed 500';
+        SET MESSAGE_TEXT = 'Cannot add more entries: Occupied lots exceed limit of 500';
     END IF;
-END;//
+END;
+//
 
 DELIMITER ;
+
 
 DELIMITER //
 
@@ -125,5 +135,57 @@ BEGIN
         RETURN 'User ID not found.';
     END IF;
 END//
+
+DELIMITER ;
+
+
+DELIMITER $$
+
+CREATE TRIGGER UpdateParkingAvailability
+AFTER INSERT ON Vehicle
+FOR EACH ROW
+BEGIN
+    -- Declare a variable to hold the Parking_Lot_ID
+    DECLARE available_spot INT;
+
+    -- Find the minimum Parking_Lot_ID where Available = 'Yes'
+    SELECT MIN(Parking_Lot_ID)
+    INTO available_spot
+    FROM Parking_Lot
+    WHERE Available != 'No';
+
+    -- Update the availability of the selected parking lot
+    IF available_spot IS NOT NULL THEN
+        UPDATE Parking_Lot
+        SET Available = 'No'
+        WHERE Parking_Lot_ID = available_spot;
+    END IF;
+END$$
+
+DELIMITER ;
+
+
+DELIMITER $$
+
+CREATE TRIGGER ReleaseParkingSpot
+AFTER INSERT ON Parking_Transaction
+FOR EACH ROW
+BEGIN
+    -- Declare a variable to hold the Parking_Lot_ID
+    DECLARE unavailable_spot INT;
+
+    -- Find the first unavailable parking spot
+    SELECT MIN(Parking_Lot_ID)
+    INTO unavailable_spot
+    FROM Parking_Lot
+    WHERE Available = 'No';
+
+    -- Update the availability of the selected parking lot
+    IF unavailable_spot IS NOT NULL THEN
+        UPDATE Parking_Lot
+        SET Available = 'Yes'
+        WHERE Parking_Lot_ID = unavailable_spot;
+    END IF;
+END$$
 
 DELIMITER ;
