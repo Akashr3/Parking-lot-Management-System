@@ -51,50 +51,6 @@ END;
 
 DELIMITER ;
 
-
-DELIMITER //
-
-CREATE TRIGGER CalculateParkingCharge
-BEFORE INSERT ON Parking_Transaction
-FOR EACH ROW
-BEGIN
-    DECLARE vehicle_type VARCHAR(50);
-    DECLARE entry_time TIMESTAMP;
-    DECLARE total_hours INT;
-    DECLARE base_rate INT;
-    DECLARE additional_rate INT;
-
-    -- Fetch vehicle details from the Vehicle table
-    SELECT Vehicle_Type, Entry_Time INTO vehicle_type, entry_time
-    FROM Vehicle
-    WHERE Vehicle_ID = NEW.Vehicle_ID;
-
-    -- Calculate the total parked hours
-   
-    IF NEW.Exit_Time IS NOT NULL AND entry_time IS NOT NULL THEN
-        SET total_hours = TIMESTAMPDIFF(HOUR, entry_time, NEW.Exit_Time);
-    ELSE
-        SET total_hours = 0; -- or handle the case as needed
-    END IF;
-
-        -- Calculate payment based on vehicle type and parked hours
-        IF vehicle_type = '2-wheeler' THEN
-            SET base_rate = 20;
-            SET additional_rate = 10;
-        ELSEIF vehicle_type = '4-wheeler' THEN
-            SET base_rate = 30;
-            SET additional_rate = 20;
-        END IF;
-
-        IF total_hours <= 3 THEN
-            SET NEW.Payment_Amount = base_rate;
-        ELSE
-            SET NEW.Payment_Amount = base_rate + CEIL((total_hours - 3) / 3) * additional_rate;
-        END IF;
-END //
-
-DELIMITER ;
-
 DELIMITER //
 
 CREATE FUNCTION update_user_details(
@@ -186,7 +142,6 @@ BEGIN
         SET Available = 'Yes'
         WHERE Parking_Lot_ID = unavailable_spot;
     END IF;
-    ALTER TABLE Parking_Lot AUTO_INCREMENT = 1;
 END$$
 
 DELIMITER ;

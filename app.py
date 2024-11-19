@@ -37,25 +37,6 @@ def load_tables():
 # Retrieve tables
 user_table, parking_lot_table,vehicle_table, payment_table, transaction_table = load_tables()
 
-# Rest of your functions
-def add_parking_transaction(vehicle_id, entry_time, exit_time):
-    connection = create_connection()
-    if connection:
-        cursor = connection.cursor()
-        # Reset the auto-increment value
-        reset_auto_increment = """
-            ALTER TABLE Parking_Transaction AUTO_INCREMENT = 1;
-        """
-        cursor.execute(reset_auto_increment)
-        insert_statement = """
-            INSERT INTO Parking_Transaction (Vehicle_ID, Entry_Time, Exit_Time)
-            VALUES (%s, %s, %s)
-        """
-        cursor.execute(insert_statement, (vehicle_id, entry_time, exit_time))
-        connection.commit()  # Commit the transaction to ensure changes are saved
-        connection.close()
-
-
 def add_user(user_name, email, phone_number,password, user_type):
     connection = create_connection()
     if connection:
@@ -110,6 +91,15 @@ def get_all_parking_transactions():
         connection.close()
         return [dict(row) for row in result]
 
+def get_all_admins():
+    connection = create_connection()
+    if connection:
+        cursor = connection.cursor()
+        cursor.execute("CALL GetAllAdmins()")
+        result = cursor.fetchall()
+        connection.close()
+        return [dict(zip([column[0] for column in cursor.description], row)) for row in result]
+    
 def get_vehicles_in_parking_lot():
     connection = create_connection()
     if connection:
@@ -144,14 +134,6 @@ def get_all_operators():
         connection.close()
         return [dict(zip([column[0] for column in cursor.description], row)) for row in result]
 
-def get_all_admins():
-    connection = create_connection()
-    if connection:
-        cursor = connection.cursor()
-        cursor.execute("CALL GetAllAdmins()")
-        result = cursor.fetchall()
-        connection.close()
-        return [dict(zip([column[0] for column in cursor.description], row)) for row in result]
 
 def get_revenue_summary(time_period):
     connection = create_connection()
@@ -255,20 +237,6 @@ def add_vehicle_entry(vehicle_type, license_plate_number):
         connection.commit()  # Commit the transaction to save changes
         connection.close()
 
-def get_vehicle_details(license_plate_number):
-    connection = create_connection()
-    if connection:
-        cursor=connection.cursor()
-        query = """
-                    SELECT Vehicle_ID, Entry_Time 
-                    FROM Vehicle 
-                    WHERE License_Plate_Number = %s
-                    """
-        cursor.execute(query, (license_plate_number,))
-        result = cursor.fetchone()
-        connection.close()
-    return result
-
 def add_parking_lot_entry():
     connection = create_connection()
     if connection:
@@ -298,6 +266,72 @@ def update_user_details(user_id, user_name, email, phone_number, user_type, pass
         return result
     except mysql.connector.Error as e:
         return f"Error: {e}"
+    
+def calculate_payment(vehicle_type, entry_time, exit_time):
+    base_rate = 20 if vehicle_type == '2-wheeler' else 30
+    additional_rate = 10 if vehicle_type == '2-wheeler' else 20
+
+    # Calculate total parked hours
+    total_hours = max(0, (exit_time - entry_time).total_seconds() // 3600)
+
+
+    # Calculate payment
+    if total_hours <= 3:
+        return base_rate
+    else:
+        additional_payment = ((total_hours - 3) / 3) * additional_rate
+        return base_rate + additional_payment
+
+# Function to add transaction
+def add_parking_transaction(license_plate_number, exit_time):
+    conn = create_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        # Fetch vehicle details
+        cursor.execute(
+            "SELECT Vehicle_Type, Vehicle_ID,Entry_Time FROM Vehicle WHERE License_Plate_Number = %s",
+            (license_plate_number,)
+        )
+        vehicle = cursor.fetchone()
+        if not vehicle:
+            return "Vehicle not found!"
+
+        # Calculate payment
+        entry_time = vehicle['Entry_Time']
+        vehicle_type = vehicle['Vehicle_Type']
+        Vehicle_ID=vehicle['Vehicle_ID']
+        payment_amount = calculate_payment(vehicle_type, entry_time, exit_time)
+
+        # Insert transaction
+        cursor.execute(
+            "INSERT INTO Parking_Transaction (License_Plate_Number, Exit_Time, Payment_Amount,Entry_Time,Vehicle_ID) VALUES (%s, %s, %s,%s,%s)",
+            (license_plate_number, exit_time, payment_amount,entry_time,Vehicle_ID)
+        )
+        conn.commit()
+        return "Parking transaction added successfully!"
+    except mysql.connector.Error as e:
+        return f"Error: {e}"
+    finally:
+        cursor.close()
+        conn.close()
+
+def showbill(license_plate_number):
+        conn = create_connection()
+        cursor = conn.cursor(dictionary=True)
+        query = """
+            SELECT 
+                pt.Transaction_ID,
+                pt.Vehicle_ID,
+                pt.License_Plate_Number,
+                pt.Entry_Time,
+                pt.Exit_Time,
+                pt.Payment_Amount
+            FROM Parking_Transaction pt
+            WHERE pt.License_Plate_Number = %s;
+        """
+        cursor.execute(query, (license_plate_number,))
+        bill_details = cursor.fetchone()  # Fetch the result
+        return bill_details
     
 def add_payment(transaction_id, payment_method, payment_amount, payment_status):
     connection = create_connection()
@@ -358,6 +392,7 @@ if 'user_type' in st.session_state:
         # Vehicle Entry Section
         st.subheader("Vehicle Entry")
         vehicle_type = st.radio("Select Vehicle Type:", ("2-wheeler", "4-wheeler"))
+
         license_plate_number = st.text_input("Enter License Plate Number:")
         if st.button("Add Vehicle"):
             if license_plate_number:
@@ -367,66 +402,35 @@ if 'user_type' in st.session_state:
             else:
                 st.error("Please enter a valid license plate number.")
 
-        st.header("New Parking Transaction")
+        st.subheader("New Parking Transaction")
         license_plate_number = st.text_input("License Plate Number")
-        
         if st.button("Generate Bill"):
-            vehicle_details = get_vehicle_details(license_plate_number)
-            if vehicle_details:
-                vehicle_id, entry_time = vehicle_details
-                exit_datetime = datetime.now()
-                
-                # Add transaction and get latest transaction details
-                add_parking_transaction(vehicle_id, entry_time, exit_datetime)
-                
-                connection = create_connection()
-                cursor = connection.cursor()
-                cursor.execute("""
-                    SELECT pt.Transaction_ID, v.License_Plate_Number, pt.Entry_Time, pt.Exit_Time, pt.Payment_Amount
-                    FROM Parking_Transaction pt
-                    JOIN Vehicle v ON pt.Vehicle_ID = v.Vehicle_ID
-                    WHERE pt.Vehicle_ID = %s
-                    ORDER BY pt.Exit_Time DESC
-                    LIMIT 1
-                """, (vehicle_id,))
-                transaction = cursor.fetchone()
-                connection.close()
-                
-                if transaction:
-                    # Store transaction details in session state
-                    st.session_state['bill'] = {
-                        "transaction_id": transaction[0],
-                        "license_plate": transaction[1],
-                        "entry_time": transaction[2],
-                        "exit_time": transaction[3],
-                        "payment_amount": transaction[4]
-                    }
+            exit_datetime = datetime.now()
+            message=add_parking_transaction(license_plate_number,exit_datetime)
+            if(message):
+                bill_details=showbill(license_plate_number)
+                if bill_details:
+                    st.write("### Bill Details:")
+                    st.write(f"**Transaction ID**: {bill_details['Transaction_ID']}")
+                    st.write(f"**Vehicle ID**: {bill_details['Vehicle_ID']}")
+                    st.write(f"**License Plate**: {bill_details['License_Plate_Number']}")
+                    st.write(f"**Entry Time**: {bill_details['Entry_Time']}")
+                    st.write(f"**Exit Time**: {bill_details['Exit_Time']}")
+                    st.write(f"**Payment Amount**: ₹{bill_details['Payment_Amount']}")
                 else:
-                    st.error("Failed to fetch transaction details.")
-            else:
-                st.error("Vehicle not found.")
-
-        # Display Bill Details if they are in session state
-        if 'bill' in st.session_state:
-            bill = st.session_state['bill']
-            st.subheader("Bill Details")
-            st.write(f"License Plate: {bill['license_plate']}")
-            st.write(f"Entry Time: {bill['entry_time']}")
-            st.write(f"Exit Time: {bill['exit_time']}")
-            st.write(f"Payment Amount: ₹{bill['payment_amount']}")
-            
-            # Payment section
-            st.subheader("Add Payment Details")
-            payment_method = st.selectbox("Payment Method", ["Cash", "Card", "UPI"], key="payment_method")
-            payment_status = st.selectbox("Payment Status", ["Pending", "Completed", "Failed"], key="payment_status")
-            
-            if st.button("Record Payment"):
-                # Add payment to the database
-                add_payment(bill["transaction_id"], payment_method, bill["payment_amount"], payment_status)
-                st.success("Payment recorded successfully!")
+                    st.error("No bill details found for the given Transaction ID.")
                 
-                # Clear the stored bill after payment
-                del st.session_state['bill']
+                st.success(message)
+        
+        payment_method = st.selectbox("Payment Method", ["Cash", "Card", "UPI"], key="payment_method")
+        payment_status = st.selectbox("Payment Status", ["Pending", "Completed", "Failed"], key="payment_status")
+        
+        if st.button("Record Payment"):
+            bill_details=showbill(license_plate_number)
+            # Payment section
+            add_payment(bill_details['Transaction_ID'], payment_method, bill_details['Payment_Amount'], payment_status)
+            st.success("Payment recorded successfully!")
+
 
     elif st.session_state['user_type'] == "Admin":
         st.header("Admin Dashboard")
