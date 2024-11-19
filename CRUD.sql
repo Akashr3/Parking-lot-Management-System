@@ -18,7 +18,7 @@ CREATE TABLE Vehicle (
     Vehicle_ID INT PRIMARY KEY AUTO_INCREMENT,
     Vehicle_Type VARCHAR(50),
     Entry_Time TIMESTAMP,
-    Licence_Plate_Number VARCHAR(20) UNIQUE
+    License_Plate_Number VARCHAR(20) UNIQUE
 );
 
 CREATE TABLE Parking_Transaction (
@@ -28,6 +28,8 @@ CREATE TABLE Parking_Transaction (
     Exit_Time TIMESTAMP,
     Payment_Amount Float,
     User_ID INT,
+    License_Plate_Number VARCHAR(20) UNIQUE,
+    foreign key (License_Plate_Number) REFERENCES Vehicle(License_Plate_Number),
     foreign key (Vehicle_ID) REFERENCES Vehicle(Vehicle_ID),
     foreign key (User_ID)REFERENCES User(User_ID)
 );
@@ -39,3 +41,4 @@ CREATE TABLE Payment (
     Payment_Status VARCHAR(20),
     FOREIGN KEY (Transaction_ID) REFERENCES Parking_Transaction(Transaction_ID)
 );
+INSERT into User values(1,'ABC','abc@pesu.com','1234567890','Admin','abc');
