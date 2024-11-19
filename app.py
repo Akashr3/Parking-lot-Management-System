@@ -143,7 +143,7 @@ def add_vehicle_entry(vehicle_type, license_plate_number):
         entry_time = datetime.now()  # Get current timestamp
     # Insert statement with %s placeholders
         insert_statement = """
-            INSERT INTO Vehicle (Vehicle_Type, Entry_Time, Licence_Plate_Number)
+            INSERT INTO Vehicle (Vehicle_Type, Entry_Time, License_Plate_Number)
             VALUES (%s, %s, %s)
         """
         cursor.execute(insert_statement, (vehicle_type, entry_time, license_plate_number))
@@ -157,7 +157,7 @@ def get_vehicle_details(license_plate):
         query = """
                     SELECT Vehicle_ID, Entry_Time 
                     FROM Vehicle 
-                    WHERE Licence_Plate_Number = %s
+                    WHERE License_Plate_Number = %s
                     """
         cursor.execute(query, (license_plate,))
         result = cursor.fetchone()
@@ -175,6 +175,24 @@ def add_parking_lot_entry():
         cursor.execute(insert_parking_lot_statement, (False,))
         connection.commit()
         connection.close() 
+
+def update_user_details(user_id, user_name, email, phone_number, user_type, password):
+    try:
+        conn = create_connection()
+        cursor = conn.cursor()
+
+        # Call the SQL function
+        cursor.execute(
+            "SELECT update_user_details(%s, %s, %s, %s, %s, %s)",
+            (user_id, user_name, email, phone_number, user_type, password)
+        )
+        result = cursor.fetchone()[0]
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return result
+    except mysql.connector.Error as e:
+        return f"Error: {e}"
 
 # Streamlit UI setup and other code remain unchanged
 st.set_page_config(page_title="Parking Lot Management System")
@@ -236,7 +254,7 @@ if 'user_type' in st.session_state:
                 connection = create_connection()
                 cursor = connection.cursor()
                 cursor.execute("""
-                                    SELECT v.Licence_Plate_Number, pt.Entry_Time, pt.Exit_Time, pt.Payment_Amount
+                                    SELECT v.License_Plate_Number, pt.Entry_Time, pt.Exit_Time, pt.Payment_Amount
                                     FROM Parking_Transaction pt
                                     JOIN Vehicle v ON pt.Vehicle_ID = v.Vehicle_ID
                                     WHERE pt.Vehicle_ID = %s AND pt.Exit_Time = %s
@@ -297,4 +315,29 @@ if 'user_type' in st.session_state:
         if st.button("View All admins"):
             admins = get_all_admins()
             st.write(admins)
+
+        st.title("Update User Details")
+        # Input fields for updating user details
+        user_id = st.number_input("User ID", min_value=1, step=1)
+        user_name = st.text_input("User Name (Leave blank to skip)")
+        email = st.text_input("Email (Leave blank to skip)")
+        phone_number = st.text_input("Phone Number (Leave blank to skip)")
+        user_type = st.text_input("User Type (Leave blank to skip)")
+        password = st.text_input("Password (Leave blank to skip)")
+
+        # Button to update details
+        if st.button("Update User Details"):
+            if user_id:
+            #Pass None for fields that are left blank
+                result = update_user_details(
+                    user_id,
+                    user_name if user_name.strip() else None,
+                    email if email.strip() else None,
+                    phone_number if phone_number.strip() else None,
+                    user_type if user_type.strip() else None,
+                    password if password.strip() else None
+                )
+                st.success(result)
+            else:
+                st.error("Please enter a valid User ID.")
 
