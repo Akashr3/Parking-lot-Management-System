@@ -538,70 +538,23 @@ if 'user_type' in st.session_state:
                 st.info("No transactions recorded for this month.")
 
 
-'''def calculate_payment(vehicle_type, entry_time, exit_time):
-    base_rate = 20 if vehicle_type == '2-wheeler' else 30
-    additional_rate = 10 if vehicle_type == '2-wheeler' else 20
-
-    # Calculate total parked hours
-    total_hours = max(0, (exit_time - entry_time).total_seconds() // 3600)
-
-
-    # Calculate payment
-    if total_hours <= 3:
-        return base_rate
-    else:
-        additional_payment = ((total_hours - 3) / 3) * additional_rate
-        return base_rate + additional_payment
-
-# Function to add transaction
-def add_parking_transaction(license_plate_number, exit_time):
-    conn = create_connection()
-    cursor = conn.cursor(dictionary=True)
-    try:
-        # Fetch vehicle details
-        cursor.execute(
-            "SELECT Vehicle_Type, Vehicle_ID,Entry_Time FROM Vehicle WHERE License_Plate_Number = %s",
-            (license_plate_number,)
-        )
-        vehicle = cursor.fetchone()
-        if not vehicle:
-            return "Vehicle not found!"
-
-        # Calculate payment
-        entry_time = vehicle['Entry_Time']
-        vehicle_type = vehicle['Vehicle_Type']
-        Vehicle_ID=vehicle['Vehicle_ID']
-        payment_amount = calculate_payment(vehicle_type, entry_time, exit_time)
-
-        # Insert transaction
-        cursor.execute(
-            "INSERT INTO Parking_Transaction (License_Plate_Number, Exit_Time, Payment_Amount,Entry_Time,Vehicle_ID) VALUES (%s, %s, %s,%s,%s)",
-            (license_plate_number, exit_time, payment_amount,entry_time,Vehicle_ID)
-        )
-        conn.commit()
-        return "Parking transaction added successfully!"
-    except mysql.connector.Error as e:
-        return f"Error: {e}"
-    finally:
-        cursor.close()
-        conn.close()
-
-def showbill(license_plate_number):
-        conn = create_connection()
-        cursor = conn.cursor(dictionary=True)
-        query = """
-            SELECT 
-                pt.Transaction_ID,
-                pt.Vehicle_ID,
-                pt.License_Plate_Number,
-                pt.Entry_Time,
-                pt.Exit_Time,
-                pt.Payment_Amount
-            FROM Parking_Transaction pt
-            WHERE pt.License_Plate_Number = %s;
-        """
-        cursor.execute(query, (license_plate_number,))
-        bill_details = cursor.fetchone()  # Fetch the result
-        return bill_details
-    
+''' 
+        st.subheader("New Parking Transaction")
+        license_plate_number = st.text_input("License Plate Number")
+        if st.button("Generate Bill"):
+            exit_datetime = datetime.now()
+            message=add_parking_transaction(license_plate_number,exit_datetime)
+            if(message):
+                bill_details=showbill(license_plate_number)
+                if bill_details:
+                    st.write("### Bill Details:")
+                    st.write(f"**Transaction ID**: {bill_details['Transaction_ID']}")
+                    st.write(f"**Vehicle ID**: {bill_details['Vehicle_ID']}")
+                    st.write(f"**License Plate**: {bill_details['License_Plate_Number']}")
+                    st.write(f"**Entry Time**: {bill_details['Entry_Time']}")
+                    st.write(f"**Exit Time**: {bill_details['Exit_Time']}")
+                    st.write(f"**Payment Amount**: ₹{bill_details['Payment_Amount']}")
+                else:
+                    st.error("No bill details found for the given Transaction ID.")
+                st.success(message)
 '''
