@@ -2,7 +2,7 @@ import streamlit as st
 from sqlalchemy import Table, MetaData, create_engine, select
 import mysql.connector
 from mysql.connector import Error
-from datetime import datetime
+from datetime import datetime, date
 
 # Database metadata setup
 metadata = MetaData()
@@ -95,6 +95,31 @@ def get_all_parking_transactions():
         connection.close()
         return [dict(row) for row in result]
 
+def get_vehicles_in_parking_lot():
+    connection = create_connection()
+    if connection:
+        cursor = connection.cursor()
+        try:
+            query = """
+                SELECT v.Vehicle_ID, v.Licence_Plate_Number, v.Vehicle_Type
+                FROM Vehicle v
+            """
+            cursor.execute(query)
+            vehicles = cursor.fetchall()
+            return [
+                {
+                    "Vehicle ID": vehicle[0],
+                    "License Plate": vehicle[1],
+                    "Vehicle Type": vehicle[2],
+                }
+                for vehicle in vehicles
+            ]
+        except Error as e:
+            st.error(f"Error fetching vehicles: {e}")
+        finally:
+            connection.close()
+    return []
+
 def get_all_operators():
     connection = create_connection()
     if connection:
@@ -112,6 +137,66 @@ def get_all_admins():
         result = cursor.fetchall()
         connection.close()
         return [dict(zip([column[0] for column in cursor.description], row)) for row in result]
+
+def get_revenue_summary(time_period):
+    connection = create_connection()
+    if connection:
+        cursor = connection.cursor()
+        try:
+            if time_period == "daily":
+                query = """
+                    SELECT DATE(Entry_Time) AS Date, COUNT(*) AS Total_Transactions, SUM(Payment_Amount) AS Total_Revenue
+                    FROM Parking_Transaction
+                    WHERE DATE(Entry_Time) = CURDATE()
+                    GROUP BY DATE(Entry_Time)
+                """
+            elif time_period == "monthly":
+                query = """
+                    SELECT MONTH(Entry_Time) AS Month, YEAR(Entry_Time) AS Year, COUNT(*) AS Total_Transactions, SUM(Payment_Amount) AS Total_Revenue
+                    FROM Parking_Transaction
+                    WHERE MONTH(Entry_Time) = MONTH(CURDATE()) AND YEAR(Entry_Time) = YEAR(CURDATE())
+                    GROUP BY YEAR(Entry_Time), MONTH(Entry_Time)
+                """
+            cursor.execute(query)
+            result = cursor.fetchall()
+            connection.close()
+            return result
+        except Error as e:
+            st.error(f"Error fetching revenue summary: {e}")
+        finally:
+            connection.close()
+    return []
+
+ # Nested function to get the last 5 transactions for a user
+def get_last_5_transactions_for_user(user_id):
+    connection = create_connection()
+    if connection:
+        cursor = connection.cursor()
+        try:
+            query = """
+                SELECT *
+                FROM Parking_Transaction
+                WHERE Transaction_ID = (
+                    SELECT MAX(Transaction_ID)
+                    FROM Parking_Transaction
+                    WHERE Vehicle_ID IN (
+                        SELECT Vehicle_ID
+                        FROM Vehicle
+                        WHERE User_ID = %s
+                    )
+                    ORDER BY Entry_Time DESC
+                    LIMIT 5
+                )
+            """
+            cursor.execute(query, (user_id,))
+            result = cursor.fetchall()
+            connection.close()
+            return result
+        except Error as e:
+            st.error(f"Error fetching last transaction: {e}")
+        finally:
+            connection.close()
+    return None     
 
 def validate_login(user_ID, password, user_type):
     connection = create_connection()
@@ -143,7 +228,7 @@ def add_vehicle_entry(vehicle_type, license_plate_number):
         entry_time = datetime.now()  # Get current timestamp
     # Insert statement with %s placeholders
         insert_statement = """
-            INSERT INTO Vehicle (Vehicle_Type, Entry_Time, License_Plate_Number)
+            INSERT INTO Vehicle (Vehicle_Type, Entry_Time, Licence_Plate_Number)
             VALUES (%s, %s, %s)
         """
         cursor.execute(insert_statement, (vehicle_type, entry_time, license_plate_number))
@@ -226,10 +311,16 @@ if login_button:
 # Only display functionalities after login
 if 'user_type' in st.session_state:
     if st.session_state['user_type'] == "Operator":
+        st.subheader("Vehicles Currently in Parking Lot")
+        vehicles = get_vehicles_in_parking_lot()
+        if vehicles:
+            st.table(vehicles)  # Use a Streamlit table to display the vehicles
+        else:
+            st.info("No vehicles currently in the parking lot.")
+        
+        # Vehicle Entry Section
         st.subheader("Vehicle Entry")
         vehicle_type = st.radio("Select Vehicle Type:", ("2-wheeler", "4-wheeler"))
-
-        # License plate input
         license_plate_number = st.text_input("Enter License Plate Number:")
         if st.button("Add Vehicle"):
             if license_plate_number:
@@ -316,7 +407,7 @@ if 'user_type' in st.session_state:
             admins = get_all_admins()
             st.write(admins)
 
-        st.title("Update User Details")
+        st.subheader("Update User Details")
         # Input fields for updating user details
         user_id = st.number_input("User ID", min_value=1, step=1)
         user_name = st.text_input("User Name (Leave blank to skip)")
@@ -340,4 +431,45 @@ if 'user_type' in st.session_state:
                 st.success(result)
             else:
                 st.error("Please enter a valid User ID.")
+        
+        st.subheader("Last 5 Parking Transactions for User")
+        user_id = st.text_input("Enter User ID to find last 5 transactions:")
+        if st.button("Fetch Last 5 Transactions"):
+            last_transactions = get_last_5_transactions_for_user(user_id)
+            if last_transactions:
+                st.write("### Last 5 Transactions")
+                for transaction in last_transactions:
+                    st.write(f"Transaction ID: {transaction[0]}")
+                    st.write(f"Vehicle ID: {transaction[1]}")
+                    st.write(f"Entry Time: {transaction[2]}")
+                    st.write(f"Exit Time: {transaction[3]}")
+                    st.write(f"Payment Amount: ₹{transaction[4]}")
+                    st.write("---")  # Separator for readability
+            else:
+                st.info("No transactions found for this user.")
+
+
+        st.subheader("Revenue Summary")
+        if st.button("View Today's Summary"):
+            daily_revenue = get_revenue_summary("daily")
+            if daily_revenue:
+                st.write("### Today's Summary")
+                for record in daily_revenue:
+                    st.write(f"Date: {record[0]}")
+                    st.write(f"Total Transactions: {record[1]}")
+                    st.write(f"Total Revenue: ₹{record[2]}")
+            else:
+                st.info("No transactions recorded for today.")
+
+        if st.button("View This Month's Summary"):
+            monthly_revenue = get_revenue_summary("monthly")
+            if monthly_revenue:
+                st.write("### This Month's Summary")
+                for record in monthly_revenue:
+                    st.write(f"Month: {record[0]}/{record[1]}")
+                    st.write(f"Total Transactions: {record[2]}")
+                    st.write(f"Total Revenue: ₹{record[3]}")
+            else:
+                st.info("No transactions recorded for this month.")
+
 
