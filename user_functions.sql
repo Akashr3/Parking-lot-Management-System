@@ -84,3 +84,46 @@ BEGIN
 END //
 
 DELIMITER ;
+
+DELIMITER //
+
+CREATE FUNCTION update_user_details(
+    in_user_id INT,
+    in_user_name VARCHAR(50),
+    in_email VARCHAR(50),
+    in_phone_number VARCHAR(15),
+    in_user_type VARCHAR(20),
+    in_password VARCHAR(255)
+) RETURNS VARCHAR(100)
+DETERMINISTIC
+BEGIN
+    -- Check if the user exists
+    IF EXISTS (SELECT 1 FROM User WHERE User_ID = in_user_id) THEN
+        -- Update user details
+        IF in_user_name IS NOT NULL THEN
+            UPDATE User SET User_Name = in_user_name WHERE User_ID = in_user_id;
+        END IF;
+
+        IF in_email IS NOT NULL THEN
+            UPDATE User SET Email = in_email WHERE User_ID = in_user_id;
+        END IF;
+
+        IF in_phone_number IS NOT NULL THEN
+            UPDATE User SET Phone_Number = in_phone_number WHERE User_ID = in_user_id;
+        END IF;
+
+        IF in_user_type IS NOT NULL THEN
+            UPDATE User SET User_Type = in_user_type WHERE User_ID = in_user_id;
+        END IF;
+
+        IF in_password IS NOT NULL THEN
+            UPDATE User SET Password = in_password WHERE User_ID = in_user_id;
+        END IF;
+
+        RETURN 'User details updated successfully.';
+    ELSE
+        RETURN 'User ID not found.';
+    END IF;
+END//
+
+DELIMITER ;
