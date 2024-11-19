@@ -186,6 +186,7 @@ BEGIN
         SET Available = 'Yes'
         WHERE Parking_Lot_ID = unavailable_spot;
     END IF;
+    ALTER TABLE Parking_Lot AUTO_INCREMENT = 1;
 END$$
 
 DELIMITER ;

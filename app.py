@@ -213,50 +213,6 @@ def get_last_5_transactions_for_user(user_id):
             connection.close()
     return None     
 
-def delete_parking_lot_entry(license_plate_number):
-    connection = create_connection()
-    if connection:
-        try:
-            cursor = connection.cursor()
-            
-            # Step 1: Get Vehicle_ID for the given License Plate Number
-            get_vehicle_id_query = """
-                SELECT Vehicle_ID 
-                FROM Vehicle 
-                WHERE License_Plate_Number = %s
-            """
-            cursor.execute(get_vehicle_id_query, (license_plate_number,))
-            result = cursor.fetchone()
-            
-            if result:
-                vehicle_id = result[0]
-                
-                # Step 2: Delete Parking_Lot entry for the fetched Vehicle_ID
-                delete_query = """
-                    DELETE FROM Parking_Lot 
-                    WHERE Parking_Lot_ID = (
-                        SELECT Parking_Lot_ID 
-                        FROM Parking_Transaction 
-                        WHERE Vehicle_ID = %s
-                        ORDER BY Transaction_ID DESC LIMIT 1
-                    )
-                """
-                cursor.execute(delete_query, (vehicle_id,))
-                reset_auto_increment = """
-                    ALTER TABLE Parking_Lot AUTO_INCREMENT = 1;
-                """
-                cursor.execute(reset_auto_increment)
-                connection.commit()
-                st.success("Parking lot entry removed for this vehicle.")
-            else:
-                st.error("No vehicle found with the provided License Plate Number.")
-        
-        except Error as e:
-            st.error(f"Error: {e}")
-        finally:
-            cursor.close()
-            connection.close()
-
 def validate_login(user_ID, password, user_type):
     connection = create_connection()
     if connection:
@@ -342,6 +298,23 @@ def update_user_details(user_id, user_name, email, phone_number, user_type, pass
         return result
     except mysql.connector.Error as e:
         return f"Error: {e}"
+    
+def add_payment(transaction_id, payment_method, payment_amount, payment_status):
+    connection = create_connection()
+    if connection:
+        cursor = connection.cursor()
+        try:
+            insert_statement = """
+                INSERT INTO Payment (Transaction_ID, Payment_Method, Payment_Amount, Payment_Status)
+                VALUES (%s, %s, %s, %s)
+            """
+            cursor.execute(insert_statement, (transaction_id, payment_method, payment_amount, payment_status))
+            connection.commit()  # Commit the transaction to save changes
+            st.success("Payment recorded successfully!")
+        except Error as e:
+            st.error(f"Error adding payment: {e}")
+        finally:
+            connection.close()
 
 # Streamlit UI setup and other code remain unchanged
 st.set_page_config(page_title="Parking Lot Management System")
@@ -402,30 +375,58 @@ if 'user_type' in st.session_state:
             if vehicle_details:
                 vehicle_id, entry_time = vehicle_details
                 exit_datetime = datetime.now()
-            # Add transaction (payment amount is automatically calculated by the trigger)
+                
+                # Add transaction and get latest transaction details
                 add_parking_transaction(vehicle_id, entry_time, exit_datetime)
-                st.success("Bill Generated")
-
+                
                 connection = create_connection()
                 cursor = connection.cursor()
                 cursor.execute("""
-                                    SELECT v.License_Plate_Number, pt.Entry_Time, pt.Exit_Time, pt.Payment_Amount
-                                    FROM Parking_Transaction pt
-                                    JOIN Vehicle v ON pt.Vehicle_ID = v.Vehicle_ID
-                                    WHERE pt.Vehicle_ID = %s AND pt.Exit_Time = %s
-                                """, (vehicle_id, exit_datetime))
+                    SELECT pt.Transaction_ID, v.License_Plate_Number, pt.Entry_Time, pt.Exit_Time, pt.Payment_Amount
+                    FROM Parking_Transaction pt
+                    JOIN Vehicle v ON pt.Vehicle_ID = v.Vehicle_ID
+                    WHERE pt.Vehicle_ID = %s
+                    ORDER BY pt.Exit_Time DESC
+                    LIMIT 1
+                """, (vehicle_id,))
                 transaction = cursor.fetchone()
-                if transaction:
-                    license_plate, entry_time, exit_time, payment_amount = transaction
-                    st.subheader("Bill Details")
-                    st.write(f"License Plate: {license_plate}")
-                    st.write(f"Entry Time: {entry_time}")
-                    st.write(f"Exit Time: {exit_time}")
-                    st.write(f"Payment Amount: ₹{payment_amount}")
-                    delete_parking_lot_entry(license_plate_number)
                 connection.close()
+                
+                if transaction:
+                    # Store transaction details in session state
+                    st.session_state['bill'] = {
+                        "transaction_id": transaction[0],
+                        "license_plate": transaction[1],
+                        "entry_time": transaction[2],
+                        "exit_time": transaction[3],
+                        "payment_amount": transaction[4]
+                    }
+                else:
+                    st.error("Failed to fetch transaction details.")
             else:
                 st.error("Vehicle not found.")
+
+        # Display Bill Details if they are in session state
+        if 'bill' in st.session_state:
+            bill = st.session_state['bill']
+            st.subheader("Bill Details")
+            st.write(f"License Plate: {bill['license_plate']}")
+            st.write(f"Entry Time: {bill['entry_time']}")
+            st.write(f"Exit Time: {bill['exit_time']}")
+            st.write(f"Payment Amount: ₹{bill['payment_amount']}")
+            
+            # Payment section
+            st.subheader("Add Payment Details")
+            payment_method = st.selectbox("Payment Method", ["Cash", "Card", "UPI"], key="payment_method")
+            payment_status = st.selectbox("Payment Status", ["Pending", "Completed", "Failed"], key="payment_status")
+            
+            if st.button("Record Payment"):
+                # Add payment to the database
+                add_payment(bill["transaction_id"], payment_method, bill["payment_amount"], payment_status)
+                st.success("Payment recorded successfully!")
+                
+                # Clear the stored bill after payment
+                del st.session_state['bill']
 
     elif st.session_state['user_type'] == "Admin":
         st.header("Admin Dashboard")
