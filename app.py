@@ -42,6 +42,11 @@ def add_parking_transaction(vehicle_id, entry_time, exit_time):
     connection = create_connection()
     if connection:
         cursor = connection.cursor()
+        # Reset the auto-increment value
+        reset_auto_increment = """
+            ALTER TABLE Parking_Transaction AUTO_INCREMENT = 1;
+        """
+        cursor.execute(reset_auto_increment)
         insert_statement = """
             INSERT INTO Parking_Transaction (Vehicle_ID, Entry_Time, Exit_Time)
             VALUES (%s, %s, %s)
@@ -55,6 +60,11 @@ def add_user(user_name, email, phone_number,password, user_type):
     connection = create_connection()
     if connection:
         cursor = connection.cursor()
+        # Reset the auto-increment value
+        reset_auto_increment = """
+            ALTER TABLE User AUTO_INCREMENT = 1;
+        """
+        cursor.execute(reset_auto_increment)
         insert_statement = f"""
             INSERT INTO User (User_Name, Email, Phone_Number, password,User_Type)
             VALUES (%s, %s, %s, %s,%s)
@@ -76,6 +86,11 @@ def delete_user(user_id):
                 DELETE FROM User WHERE User_ID = %s;
             """
             cursor.execute(delete_statement, (user_id,))
+            # Reset the auto-increment value
+            reset_auto_increment = """
+                ALTER TABLE User AUTO_INCREMENT = 1;
+            """
+            cursor.execute(reset_auto_increment)
             connection.commit()  # Commit the transaction
             connection.close()
             return True
@@ -225,6 +240,11 @@ def add_vehicle_entry(vehicle_type, license_plate_number):
     connection = create_connection()
     if connection:
         cursor = connection.cursor()
+        # Reset the auto-increment value
+        reset_auto_increment = """
+            ALTER TABLE Vehicle AUTO_INCREMENT = 1;
+        """
+        cursor.execute(reset_auto_increment)
         entry_time = datetime.now()  # Get current timestamp
     # Insert statement with %s placeholders
         insert_statement = """
