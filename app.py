@@ -13,8 +13,8 @@ def create_connection():
         connection = mysql.connector.connect(
             host='localhost',
             user='root',
-            password='141926abhay',
-            database='PLMSFinal'
+            password='Aka789sh',
+            database='PLMS'
         )
         if connection.is_connected():
             return connection
@@ -24,7 +24,7 @@ def create_connection():
 
 # Load tables
 def load_tables():
-    engine = create_engine("mysql+mysqlconnector://root:141926abhay@localhost:3306/PLMSFinal")
+    engine = create_engine("mysql+mysqlconnector://root:Aka789sh@localhost:3306/PLMS")
     metadata.reflect(bind=engine)
     return (
         metadata.tables["User"],
@@ -542,3 +542,23 @@ if 'user_type' in st.session_state:
                 st.info("No transactions recorded for this month.")
 
 
+''' 
+        st.subheader("New Parking Transaction")
+        license_plate_number = st.text_input("License Plate Number")
+        if st.button("Generate Bill"):
+            exit_datetime = datetime.now()
+            message=add_parking_transaction(license_plate_number,exit_datetime)
+            if(message):
+                bill_details=showbill(license_plate_number)
+                if bill_details:
+                    st.write("### Bill Details:")
+                    st.write(f"**Transaction ID**: {bill_details['Transaction_ID']}")
+                    st.write(f"**Vehicle ID**: {bill_details['Vehicle_ID']}")
+                    st.write(f"**License Plate**: {bill_details['License_Plate_Number']}")
+                    st.write(f"**Entry Time**: {bill_details['Entry_Time']}")
+                    st.write(f"**Exit Time**: {bill_details['Exit_Time']}")
+                    st.write(f"**Payment Amount**: ₹{bill_details['Payment_Amount']}")
+                else:
+                    st.error("No bill details found for the given Transaction ID.")
+                st.success(message)
+'''
