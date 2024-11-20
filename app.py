@@ -22,6 +22,24 @@ def create_connection():
         st.error(f"Error: {e}")
         return None
 
+def get_db_connection(user_type):
+    if user_type == 'Admin':
+        return mysql.connector.connect(
+            host='localhost',
+            user='admin_user',
+            password='pass123',
+            database='PLMSFinal'
+        )
+    elif user_type == 'Operator':
+        return mysql.connector.connect(
+            host='localhost',
+            user='operator_user',
+            password='123pass',
+            database='PLMSFinal'
+        )
+    else:
+        raise ValueError("Invalid user type")
+
 # Load tables
 def load_tables():
     engine = create_engine("mysql+mysqlconnector://root:141926abhay@localhost:3306/PLMSFinal")
@@ -38,7 +56,7 @@ def load_tables():
 user_table, parking_lot_table,vehicle_table, payment_table, transaction_table = load_tables()
 
 def add_user(user_name, email, phone_number,password, user_type):
-    connection = create_connection()
+    connection = get_db_connection('Admin')
     if connection:
         cursor = connection.cursor()
         # Reset the auto-increment value
@@ -59,7 +77,7 @@ def add_user(user_name, email, phone_number,password, user_type):
         return user_info
         
 def delete_user(user_id):
-    connection = create_connection()
+    connection = get_db_connection('Admin')
     if connection:
         try:
             cursor = connection.cursor()
@@ -83,7 +101,7 @@ def delete_user(user_id):
 
 
 def get_all_parking_transactions():
-    connection = create_connection()
+    connection = get_db_connection()
     if connection:
         cursor = connection.cursor()
         cursor.execute("SELECT * FROM Parking_Transaction")
@@ -92,7 +110,7 @@ def get_all_parking_transactions():
         return [dict(row) for row in result]
 
 def get_all_admins():
-    connection = create_connection()
+    connection = get_db_connection('Admin')
     if connection:
         cursor = connection.cursor()
         cursor.execute("CALL GetAllAdmins()")
@@ -101,7 +119,7 @@ def get_all_admins():
         return [dict(zip([column[0] for column in cursor.description], row)) for row in result]
     
 def get_vehicles_in_parking_lot():
-    connection = create_connection()
+    connection = get_db_connection('Operator')
     if connection:
         cursor = connection.cursor()
         try:
@@ -126,7 +144,7 @@ def get_vehicles_in_parking_lot():
     return []
 
 def get_all_operators():
-    connection = create_connection()
+    connection = get_db_connection('Admin')
     if connection:
         cursor = connection.cursor()
         cursor.execute("CALL GetAllOperators()")
@@ -136,7 +154,7 @@ def get_all_operators():
 
 
 def get_revenue_summary(time_period):
-    connection = create_connection()
+    connection = get_db_connection('Admin')
     if connection:
         cursor = connection.cursor()
         try:
@@ -166,7 +184,7 @@ def get_revenue_summary(time_period):
 
  # Nested function to get the last 5 transactions for a user
 def get_last_5_transactions_for_user(user_id):
-    connection = create_connection()
+    connection = get_db_connection('Admin')
     if connection:
         cursor = connection.cursor()
         try:
@@ -219,7 +237,7 @@ def validate_login(user_ID, password, user_type):
         return False, "Unable to connect to the database."
     
 def add_vehicle_entry(vehicle_type, license_plate_number):
-    connection = create_connection()
+    connection = get_db_connection('Operator')
     if connection:
         cursor = connection.cursor()
         # Reset the auto-increment value
@@ -238,7 +256,7 @@ def add_vehicle_entry(vehicle_type, license_plate_number):
         connection.close()
 
 def add_parking_lot_entry():
-    connection = create_connection()
+    connection = get_db_connection('Operator')
     if connection:
         cursor=connection.cursor()
         insert_parking_lot_statement = """
@@ -251,7 +269,7 @@ def add_parking_lot_entry():
 
 def update_user_details(user_id, user_name, email, phone_number, user_type, password):
     try:
-        conn = create_connection()
+        conn = get_db_connection('Admin')
         cursor = conn.cursor()
 
         # Call the SQL function
@@ -284,7 +302,7 @@ def calculate_payment(vehicle_type, entry_time, exit_time):
 
 # Function to add transaction
 def add_parking_transaction(license_plate_number, exit_time):
-    conn = create_connection()
+    conn = get_db_connection('Operator')
     cursor = conn.cursor(dictionary=True)
     try:
         # Fetch vehicle details
@@ -316,7 +334,7 @@ def add_parking_transaction(license_plate_number, exit_time):
         conn.close()
 
 def showbill(license_plate_number):
-        conn = create_connection()
+        conn = get_db_connection('Operator')
         cursor = conn.cursor(dictionary=True)
         query = """
             SELECT 
@@ -334,7 +352,7 @@ def showbill(license_plate_number):
         return bill_details
     
 def add_payment(transaction_id, payment_method, payment_amount, payment_status):
-    connection = create_connection()
+    connection = get_db_connection('Operator')
     if connection:
         cursor = connection.cursor()
         try:
